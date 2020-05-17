@@ -24,6 +24,7 @@ import (
 
 const (
 	notFountIdx        = 64
+	startBit    uint64 = 1 << 63
 	secondsMask uint64 = 0xfffffffffffffff0
 	minutesMask uint64 = 0xfffffffffffffff0
 	hoursMask   uint64 = 0xffffff0000000000
@@ -337,12 +338,12 @@ func (expr *Expression) calculateActualDaysOfMonth(year, month int, loc *time.Lo
 
 		// Last day of month(L Flag)
 		if expr.lastDayOfMonth {
-			actualDaysOfMonth |= 1 << (63 - lastDay)
+			actualDaysOfMonth |= startBit >> lastDay
 		}
 		// Last work day of month(LW Flag)
 		if expr.lastWorkdayOfMonth {
 			workday := lastWorkdayOfMonth(lastDay, lastDayOfMonth.Weekday())
-			actualDaysOfMonth |= 1 << (63 - workday)
+			actualDaysOfMonth |= startBit >> workday
 		}
 		// Work days of month ({Number}W)
 		// As per Wikipedia: month boundaries are not crossed.
@@ -352,18 +353,18 @@ func (expr *Expression) calculateActualDaysOfMonth(year, month int, loc *time.Lo
 			end := 63 - bits.TrailingZeros64(workdaysOfMonth)
 			if start == 1 {
 				workday := firstWorkdayOfMonth(firstWeekday)
-				actualDaysOfMonth |= 1 << (63 - workday)
+				actualDaysOfMonth |= startBit >> workday
 				start++
 			}
 			for v := start; v <= end && v < lastDay; v++ {
-				if workdaysOfMonth&(1<<(63-v)) != 0 {
+				if workdaysOfMonth&(startBit>>v) != 0 {
 					workday := midWorkdayOfMonth(v, time.Weekday(int(firstWeekday)+v-1)%7)
-					actualDaysOfMonth |= 1 << (63 - workday)
+					actualDaysOfMonth |= startBit >> workday
 				}
 			}
 			if end == lastDay {
 				workday := lastWorkdayOfMonth(lastDay, lastWeekday)
-				actualDaysOfMonth |= 1 << (63 - workday)
+				actualDaysOfMonth |= startBit >> workday
 			}
 		}
 	}

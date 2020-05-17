@@ -59,8 +59,8 @@ func Parse(spec string) (*Expression, error) {
 	parser := 0
 	// second field (optional)
 	if fieldCount == 5 {
-		expr.seconds = 1 << 63 // 0 second
-		parser++               // set minute parser to the first
+		expr.seconds = startBit // 0 second
+		parser++                // set minute parser to the first
 	}
 
 	for field < fieldCount && parser < len(fieldParsers) {
@@ -78,11 +78,11 @@ func Parse(spec string) (*Expression, error) {
 
 	// special handling for day of week
 	// 7->0
-	if expr.daysOfWeek&(1<<(63-7)) != 0 {
-		expr.daysOfWeek |= 1 << 63
+	if expr.daysOfWeek&(startBit>>7) != 0 {
+		expr.daysOfWeek |= startBit
 	}
-	if expr.lastWeekdaysOfWeek&(1<<(63-7)) != 0 {
-		expr.lastWeekdaysOfWeek |= 1 << 63
+	if expr.lastWeekdaysOfWeek&(startBit>>7) != 0 {
+		expr.lastWeekdaysOfWeek |= startBit
 	}
 
 	// expand to 5 week
@@ -106,21 +106,21 @@ func parseNamedExpression(spec string) (*Expression, error) {
 	case "@yearly", "@annually":
 		return &Expression{
 			expression:  spec, //0 0 0 1 1 * *
-			seconds:     1 << 63,
-			minutes:     1 << 63,
-			hours:       1 << 63,
-			daysOfMonth: 1 << 62,
-			months:      1 << 62,
+			seconds:     startBit,
+			minutes:     startBit,
+			hours:       startBit,
+			daysOfMonth: startBit >> 1,
+			months:      startBit >> 1,
 			daysOfWeek:  weeksMask,
 			years:       allYears,
 		}, nil
 	case "@monthly":
 		return &Expression{
 			expression:  spec, // 0 0 0 1 * * *
-			seconds:     1 << 63,
-			minutes:     1 << 63,
-			hours:       1 << 63,
-			daysOfMonth: 1 << 62,
+			seconds:     startBit,
+			minutes:     startBit,
+			hours:       startBit,
+			daysOfMonth: startBit >> 1,
 			months:      monthsMask,
 			daysOfWeek:  weeksMask,
 			years:       allYears,
@@ -128,9 +128,9 @@ func parseNamedExpression(spec string) (*Expression, error) {
 	case "@weekly":
 		return &Expression{
 			expression:  spec, // 0 0 0 * * 0 *
-			seconds:     1 << 63,
-			minutes:     1 << 63,
-			hours:       1 << 63,
+			seconds:     startBit,
+			minutes:     startBit,
+			hours:       startBit,
 			daysOfMonth: daysMask,
 			months:      monthsMask,
 			daysOfWeek:  genWeekdayBits([7]bool{0: true}),
@@ -139,9 +139,9 @@ func parseNamedExpression(spec string) (*Expression, error) {
 	case "@daily", "@midnight":
 		return &Expression{
 			expression:  spec, // 0 0 0 * * * *
-			seconds:     1 << 63,
-			minutes:     1 << 63,
-			hours:       1 << 63,
+			seconds:     startBit,
+			minutes:     startBit,
+			hours:       startBit,
 			daysOfMonth: daysMask,
 			months:      monthsMask,
 			daysOfWeek:  weeksMask,
@@ -150,8 +150,8 @@ func parseNamedExpression(spec string) (*Expression, error) {
 	case "@hourly":
 		return &Expression{
 			expression:  spec, // 0 0 * * * * *
-			seconds:     1 << 63,
-			minutes:     1 << 63,
+			seconds:     startBit,
+			minutes:     startBit,
 			hours:       hoursMask,
 			daysOfMonth: daysMask,
 			months:      monthsMask,
@@ -168,7 +168,7 @@ var fieldParsers = []fieldParser{
 		"second",
 		func(expr *Expression, begin, end, step int) {
 			for i := begin; i <= end; i += step {
-				expr.seconds |= 1 << (63 - i)
+				expr.seconds |= startBit >> i
 			}
 		},
 		0, 59,
@@ -179,7 +179,7 @@ var fieldParsers = []fieldParser{
 		"minute",
 		func(expr *Expression, begin, end, step int) {
 			for i := begin; i <= end; i += step {
-				expr.minutes |= 1 << (63 - i)
+				expr.minutes |= startBit >> i
 			}
 		},
 		0, 59,
@@ -190,7 +190,7 @@ var fieldParsers = []fieldParser{
 		"hour",
 		func(expr *Expression, begin, end, step int) {
 			for i := begin; i <= end; i += step {
-				expr.hours |= 1 << (63 - i)
+				expr.hours |= startBit >> i
 			}
 		},
 		0, 23,
@@ -201,7 +201,7 @@ var fieldParsers = []fieldParser{
 		"day of month",
 		func(expr *Expression, begin, end, step int) {
 			for i := begin; i <= end; i += step {
-				expr.daysOfMonth |= 1 << (63 - i)
+				expr.daysOfMonth |= startBit >> i
 			}
 		},
 		1, 31,
@@ -212,7 +212,7 @@ var fieldParsers = []fieldParser{
 		"month",
 		func(expr *Expression, begin, end, step int) {
 			for i := begin; i <= end; i += step {
-				expr.months |= 1 << (63 - i)
+				expr.months |= startBit >> i
 			}
 		},
 		1, 12,
@@ -223,7 +223,7 @@ var fieldParsers = []fieldParser{
 		"day of week",
 		func(expr *Expression, begin, end, step int) {
 			for i := begin; i <= end; i += step {
-				expr.daysOfWeek |= 1 << (63 - i)
+				expr.daysOfWeek |= startBit >> i
 			}
 		},
 		0, 7,
@@ -234,7 +234,7 @@ var fieldParsers = []fieldParser{
 		"year",
 		func(expr *Expression, begin, end, step int) {
 			for i := begin - 1970; i <= end-1970; i += step {
-				expr.years[i>>6] |= 1 << (63 - i&0x3f)
+				expr.years[i>>6] |= startBit >> (i & 0x3f)
 			}
 		},
 		1970, 2099,
@@ -362,7 +362,7 @@ func parseSpecDomEntry(expr *Expression, entry string, atoi func(string) (int, b
 		if !ok || n < min || n > max {
 			return false
 		}
-		expr.workdaysOfMonth |= 1 << (63 - n)
+		expr.workdaysOfMonth |= startBit >> n
 		return true
 	}
 	return false
@@ -379,7 +379,7 @@ func parseSpecDowEntry(expr *Expression, entry string, atoi func(string) (int, b
 		if !ok || n < min || n > max {
 			return false
 		}
-		expr.lastWeekdaysOfWeek |= 1 << (63 - n)
+		expr.lastWeekdaysOfWeek |= startBit >> n
 		return true
 	}
 
@@ -397,7 +397,7 @@ func parseSpecDowEntry(expr *Expression, entry string, atoi func(string) (int, b
 			weekday = 0
 		}
 		n := (ith-1)*7 + weekday
-		expr.ithWeekdaysOfWeek |= 1 << (63 - n - 1) // sun is bit 1
+		expr.ithWeekdaysOfWeek |= startBit >> (n + 1) // sun is bit 1
 		return true
 	}
 	return false
@@ -409,7 +409,7 @@ func genWeekdayBits(weekdays [7]bool) uint64 {
 	for k := 0; k < 5; k++ {
 		for _, b := range weekdays {
 			if b {
-				v |= 1 << (63 - i)
+				v |= startBit >> i
 			}
 			i++
 		}
