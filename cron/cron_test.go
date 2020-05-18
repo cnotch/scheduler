@@ -5,8 +5,11 @@
 package cron
 
 import (
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type crontimes struct {
@@ -202,15 +205,11 @@ func TestExpressions(t *testing.T) {
 	for _, test := range crontests {
 		for _, times := range test.times {
 			from, _ := time.Parse("2006-01-02 15:04:05", times.from)
-			expr, err := Parse(test.expr)
-			if err != nil {
-				t.Errorf(`Parse("%s") returned "%s"`, test.expr, err.Error())
-			}
+			expr := MustParse(test.expr)
 			next := expr.Next(from)
 			nextstr := next.Format(test.layout)
-			if nextstr != times.next {
-				t.Errorf(`("%s").Next("%s") = "%s", got "%s"`, test.expr, times.from, times.next, nextstr)
-			}
+			assert.Equal(t, times.next, nextstr,
+				fmt.Sprintf(`("%s").Next("%s")`, test.expr, times.from))
 		}
 	}
 }
@@ -218,20 +217,13 @@ func TestExpressions(t *testing.T) {
 func TestZero(t *testing.T) {
 	from, _ := time.Parse("2006-01-02", "2013-08-31")
 	next := MustParse("0 * * * * * 1980").Next(from)
-	if next.IsZero() == false {
-		t.Error(`("* * * * * 1980").Next("2013-08-31").IsZero() returned 'false', expected 'true'`)
-	}
+	assert.True(t, next.IsZero(), `("* * * * * 1980").Next("2013-08-31")`)
 
 	next = MustParse("0 * * * * * 2050").Next(from)
-	if next.IsZero() == true {
-		t.Error(`("* * * * * 2050").Next("2013-08-31").IsZero() returned 'true', expected 'false'`)
-		t.Error(next)
-	}
+	assert.False(t, next.IsZero(), `("* * * * * 2050").Next("2013-08-31")`)
 
 	next = MustParse("0 * * * * * 2099").Next(time.Time{})
-	if next.IsZero() == false {
-		t.Error(`("* * * * * 2014").Next(time.Time{}).IsZero() returned 'true', expected 'false'`)
-	}
+	assert.True(t, next.IsZero(), `("* * * * * 2014").Next(time.Time{})`)
 }
 
 func TestInterval_Interval60Issue(t *testing.T) {
