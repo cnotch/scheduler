@@ -13,7 +13,8 @@ import (
 	"github.com/cnotch/scheduler/cron"
 )
 
-// IndPeriod executes the first time at the specified delay, followed by a fixed period.
+// IndPeriod posts the function f which will execute the first time
+// at the specified delay, followed by a fixed period.
 // If the execution time of f exceeds the period, there will
 // be multiple instances of f running at the same time.
 func IndPeriod(initialDelay, period time.Duration, f func(), panicHandler func(r interface{})) context.CancelFunc {
@@ -54,7 +55,8 @@ func IndPeriod(initialDelay, period time.Duration, f func(), panicHandler func(r
 	return cancel
 }
 
-// IndDelay executes the first time at the specified delay, followed by a fixed delay.
+// IndDelay posts the function f which will execute the first time
+// at the specified delay, followed by a fixed dlay.
 // The next execution time is delayed 'delay' after the last execution.
 // Unlike IndPeriod, it never has multiple instances of f running at the same time.
 func IndDelay(initialDelay, delay time.Duration, f func(), panicHandler func(r interface{})) context.CancelFunc {
@@ -87,7 +89,7 @@ func IndDelay(initialDelay, delay time.Duration, f func(), panicHandler func(r i
 	return cancel
 }
 
-// IndCron Execute f according to a cron expression
+// IndCron posts the function f which will execute according to a cron expression.
 func IndCron(expression string, f func(), panicHandler func(r interface{})) (cancel context.CancelFunc, err error) {
 	var cronExp *cron.Expression
 	cronExp, err = cron.Parse(expression)
@@ -98,7 +100,7 @@ func IndCron(expression string, f func(), panicHandler func(r interface{})) (can
 	return
 }
 
-// IndSchedule executes f according to schedule
+// IndSchedule posts the function f which will execute according to the specified schedule.
 func IndSchedule(schedule Schedule, f func(), panicHandler func(r interface{})) context.CancelFunc {
 	ctx, cancel := context.WithCancel(context.Background())
 	safeRun := safeWrap(f, panicHandler)
