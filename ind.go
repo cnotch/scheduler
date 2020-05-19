@@ -13,25 +13,13 @@ import (
 	"github.com/cnotch/scheduler/cron"
 )
 
-const (
-	// MinPeriod minimum period or delay
-	MinPeriod = time.Microsecond
-)
-
-// PanicHandler is to handle panic caused by an asynchronous job.
-type PanicHandler func(r interface{})
-
-// IndPeriod executes f for a fixed period.
+// IndPeriod executes the first time at the specified delay, followed by a fixed period.
 // If the execution time of f exceeds the period, there will
 // be multiple instances of f running at the same time.
-func IndPeriod(initialDelay, period time.Duration, f func(), ph PanicHandler) context.CancelFunc {
-	if period < MinPeriod {
-		panic("preiod must not be less than 1μs")
-	}
-
+func IndPeriod(initialDelay, period time.Duration, f func(), panicHandler func(r interface{})) context.CancelFunc {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	safeRun := safeWrap(f, ph)
+	safeRun := safeWrap(f, panicHandler)
 
 	go func() {
 		if initialDelay <= 0 {
@@ -66,16 +54,13 @@ func IndPeriod(initialDelay, period time.Duration, f func(), ph PanicHandler) co
 	return cancel
 }
 
-// IndDelay executes f at a fixed delay.
+// IndDelay executes the first time at the specified delay, followed by a fixed delay.
 // The next execution time is delayed 'delay' after the last execution.
 // Unlike IndPeriod, it never has multiple instances of f running at the same time.
-func IndDelay(initialDelay, delay time.Duration, f func(), ph PanicHandler) context.CancelFunc {
-	if delay < MinPeriod {
-		panic("delay must not be less than 1μs")
-	}
+func IndDelay(initialDelay, delay time.Duration, f func(), panicHandler func(r interface{})) context.CancelFunc {
 
 	ctx, cancel := context.WithCancel(context.Background())
-	safeRun := safeWrap(f, ph)
+	safeRun := safeWrap(f, panicHandler)
 
 	go func() {
 		d := initialDelay
@@ -103,20 +88,20 @@ func IndDelay(initialDelay, delay time.Duration, f func(), ph PanicHandler) cont
 }
 
 // IndCron Execute f according to a cron expression
-func IndCron(expression string, f func(), ph PanicHandler) (cancel context.CancelFunc, err error) {
+func IndCron(expression string, f func(), panicHandler func(r interface{})) (cancel context.CancelFunc, err error) {
 	var cronExp *cron.Expression
 	cronExp, err = cron.Parse(expression)
 	if err != nil {
 		return
 	}
-	cancel = IndSchedule(cronExp, f, ph)
+	cancel = IndSchedule(cronExp, f, panicHandler)
 	return
 }
 
 // IndSchedule executes f according to schedule
-func IndSchedule(schedule Schedule, f func(), ph PanicHandler) context.CancelFunc {
+func IndSchedule(schedule Schedule, f func(), panicHandler func(r interface{})) context.CancelFunc {
 	ctx, cancel := context.WithCancel(context.Background())
-	safeRun := safeWrap(f, ph)
+	safeRun := safeWrap(f, panicHandler)
 
 	go func() {
 		next := time.Now()
@@ -145,12 +130,12 @@ func IndSchedule(schedule Schedule, f func(), ph PanicHandler) context.CancelFun
 	return cancel
 }
 
-func safeWrap(f func(), ph PanicHandler) func() {
+func safeWrap(f func(), panicHandler func(r interface{})) func() {
 	return func() {
 		defer func() {
 			if r := recover(); r != nil {
-				if ph != nil {
-					ph(r)
+				if panicHandler != nil {
+					panicHandler(r)
 				} else {
 					fmt.Fprintf(os.Stderr, "panic: %+v", r)
 				}
