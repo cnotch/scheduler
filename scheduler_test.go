@@ -31,7 +31,7 @@ func TestScheduler_ScheduleAfterShutdown(t *testing.T) {
 
 		s.PeriodFunc(0, time.Second, func() {
 			atomic.AddInt32(&counter, 1)
-		})
+		}, nil)
 		<-time.After(2 * oneSecond)
 		s.ShutdownAndWait()
 		want := int32(3)
@@ -40,7 +40,7 @@ func TestScheduler_ScheduleAfterShutdown(t *testing.T) {
 
 		_, err := s.PeriodFunc(0, time.Second, func() {
 			atomic.AddInt32(&counter, 1)
-		})
+		}, nil)
 		assert.NotNil(t, err)
 	})
 }
@@ -52,7 +52,7 @@ func TestScheduler_After(t *testing.T) {
 		out := make(chan bool, 1)
 		mj, _ := s.AfterFunc(time.Millisecond*10, func() {
 			out <- true
-		})
+		}, nil)
 		v := <-out
 		assert.True(t, v)
 		mj.Cancel()
@@ -67,7 +67,7 @@ func TestScheduler_Period(t *testing.T) {
 
 		mj, _ := s.PeriodFunc(0, time.Second, func() {
 			atomic.AddInt32(&counter, 1)
-		})
+		}, nil)
 
 		<-time.After(oneSecond)
 		want := int32(2)
@@ -91,7 +91,7 @@ func TestScheduler_Cron(t *testing.T) {
 		wg.Add(1)
 		mj, _ := s.CronFunc("* * * * * ?", func() {
 			wg.Done()
-		})
+		}, nil)
 
 		select {
 		case <-time.After(oneSecond):
@@ -112,16 +112,16 @@ func TestScheduler_PeriodAndPanic(t *testing.T) {
 			mj, _ := s.PeriodFunc(0, time.Millisecond*10, func() {
 				atomic.AddInt32(&counter, 1)
 				panic("test")
-			})
+			}, nil)
 
 			for atomic.LoadInt32(&counter) <= 10 {
 			}
 
 			mj.Cancel()
 
-			<-time.After(100*time.Millisecond)
+			<-time.After(100 * time.Millisecond)
 			want := atomic.LoadInt32(&counter)
-			<-time.After(100*time.Millisecond)
+			<-time.After(100 * time.Millisecond)
 			got := atomic.LoadInt32(&counter)
 			assert.EqualValues(t, want, got)
 		})

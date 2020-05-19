@@ -68,42 +68,66 @@ func New(options ...Option) *Scheduler {
 	return s
 }
 
-// AfterFunc executes the function f after specified delay.
-// Execute only once, and then remove from the Scheduler.
-func (s *Scheduler) AfterFunc(delay time.Duration, f func()) (*ManagedJob, error) {
-	return s.Schedule(&afterSchedule{delay: delay}, JobFunc(f))
+// AfterFunc posts the function f which will execute after specified delay.
+// The function f executes only once, and then remove from the Scheduler.
+func (s *Scheduler) AfterFunc(delay time.Duration, f func(), tag interface{}) (*ManagedJob, error) {
+	return s.After(delay, JobFunc(f), tag)
 }
 
-// PeriodFunc executes the first time at the specified delay, followed by a fixed period.
+// After posts the job which will execute after specified delay.
+// The job executes only once, and then remove from the Scheduler.
+func (s *Scheduler) After(delay time.Duration, job Job, tag interface{}) (*ManagedJob, error) {
+	return s.Schedule(&afterSchedule{delay: delay}, job, tag)
+}
+
+// PeriodFunc posts the function f which will execute the first time
+// at the specified delay, followed by a fixed period.
 // If the execution time of f exceeds the period, there will
 // be multiple instances of f running at the same time.
-func (s *Scheduler) PeriodFunc(initialDelay, period time.Duration, f func()) (*ManagedJob, error) {
-	return s.Schedule(&periodSchedule{initialDelay: initialDelay, period: period}, JobFunc(f))
+func (s *Scheduler) PeriodFunc(initialDelay, period time.Duration, f func(), tag interface{}) (*ManagedJob, error) {
+	return s.Period(initialDelay, period, JobFunc(f), tag)
 }
 
-// CronFunc Execute f according to a cron expression.
-func (s *Scheduler) CronFunc(cronExpr string, f func()) (*ManagedJob, error) {
+// Period posts the job which will execute the first time
+// at the specified delay, followed by a fixed period.
+// If the execution time of job exceeds the period, there will
+// be multiple instances of job running at the same time.
+func (s *Scheduler) Period(initialDelay, period time.Duration, job Job, tag interface{}) (*ManagedJob, error) {
+	if period < time.Millisecond {
+		return nil, errors.New("preiod must not be less than 1ms")
+	}
+	return s.Schedule(&periodSchedule{initialDelay: initialDelay, period: period}, job, tag)
+}
+
+// CronFunc posts the function f which will execute according to a cron expression.
+func (s *Scheduler) CronFunc(cronExpr string, f func(), tag interface{}) (*ManagedJob, error) {
+	return s.Cron(cronExpr, JobFunc(f), tag)
+}
+
+// Cron posts the job which will execute according to a cron expression.
+func (s *Scheduler) Cron(cronExpr string, job Job, tag interface{}) (*ManagedJob, error) {
 	cexp, err := cron.Parse(cronExpr)
 	if err != nil {
 		return nil, err
 	}
-	return s.Schedule(cexp, JobFunc(f))
+	return s.Schedule(cexp, job, tag)
 }
 
-// ScheduleFunc executes the function f according to the specified schedule
-func (s *Scheduler) ScheduleFunc(schedule Schedule, f func()) (*ManagedJob, error) {
-	return s.Schedule(schedule, JobFunc(f))
+// ScheduleFunc posts the function f which will execute according to the specified schedule
+func (s *Scheduler) ScheduleFunc(schedule Schedule, f func(), tag interface{}) (*ManagedJob, error) {
+	return s.Schedule(schedule, JobFunc(f), tag)
 }
 
-// Schedule executes the job according to the specified schedule.
-func (s *Scheduler) Schedule(schedule Schedule, job Job) (mjob *ManagedJob, err error) {
+// Schedule posts the job which will execute according to the specified schedule.
+func (s *Scheduler) Schedule(schedule Schedule, job Job, tag interface{}) (mjob *ManagedJob, err error) {
 	defer func() { // after terminated, add throw panic
 		if r := recover(); r != nil {
-			err = errors.New("Scheduler is terminated")
+			err = errors.New("scheduler is terminated")
 		}
 	}()
 
 	j := &ManagedJob{
+		tag:      tag,
 		schelule: schedule,
 		job:      job,
 		remove:   s.remove,
@@ -111,7 +135,7 @@ func (s *Scheduler) Schedule(schedule Schedule, job Job) (mjob *ManagedJob, err 
 
 	j.next = j.schelule.Next(s.now())
 	if j.next.IsZero() {
-		return nil, errors.New("Schedule is empty, never a scheduled time to arrive")
+		return nil, errors.New("schedule is empty, never a scheduled time to arrive")
 	}
 
 	s.add <- j
