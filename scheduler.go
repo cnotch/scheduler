@@ -53,6 +53,7 @@ type Scheduler struct {
 	wg           *sync.WaitGroup
 	add          chan *ManagedJob
 	remove       chan *ManagedJob
+	snapshot     chan chan []*ManagedJob
 	panicHandler PanicHandler
 	loc          *time.Location
 	ctx          context.Context
@@ -64,10 +65,11 @@ type Scheduler struct {
 // New returns a new Scheduler instance.
 func New(options ...Option) *Scheduler {
 	s := &Scheduler{
-		wg:     &sync.WaitGroup{},
-		add:    make(chan *ManagedJob),
-		remove: make(chan *ManagedJob),
-		loc:    time.Local,
+		wg:       &sync.WaitGroup{},
+		add:      make(chan *ManagedJob),
+		remove:   make(chan *ManagedJob),
+		snapshot: make(chan chan []*ManagedJob),
+		loc:      time.Local,
 	}
 
 	for _, option := range options {
@@ -182,10 +184,28 @@ func (s *Scheduler) Terminated() bool {
 	return s.terminated
 }
 
+// Jobs returns the scheduled jobs.
+func (s *Scheduler) Jobs() (jobs []*ManagedJob) {
+	defer func() {
+		if r := recover(); r != nil {
+			jobs = nil
+		}
+	}()
+	replyChan := make(chan []*ManagedJob, 1)
+	s.snapshot <- replyChan
+	jobs = <-replyChan
+	return
+}
+
 // Count returns jobs count.
 func (s *Scheduler) Count() int {
 	l := atomic.LoadInt64(&s.count)
 	return int(l)
+}
+
+// Location returns the time zone location of the scheduler.
+func (s *Scheduler) Location() *time.Location {
+	return s.loc
 }
 
 func (s *Scheduler) run() {
@@ -218,9 +238,15 @@ func (s *Scheduler) run() {
 			timer.Stop()
 			heap.Push(&jobs, newJ)
 
-		case removeJ := <-s.remove: // 删除作业
+		case removeJ := <-s.remove:
 			timer.Stop()
 			s.removeJob(removeJ, &jobs)
+
+		case replyChan := <-s.snapshot:
+			timer.Stop()
+			snapshotJobs := make([]*ManagedJob, len(jobs))
+			copy(snapshotJobs, jobs)
+			replyChan <- snapshotJobs
 		}
 	}
 }
@@ -268,6 +294,7 @@ func (s *Scheduler) internalClose() {
 	s.terminated = true
 	close(s.add)
 	close(s.remove)
+	close(s.snapshot)
 	atomic.StoreInt64(&s.count, 0)
 }
 

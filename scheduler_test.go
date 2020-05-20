@@ -5,6 +5,7 @@
 package scheduler
 
 import (
+	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -165,4 +166,76 @@ func wait(wg *sync.WaitGroup) chan bool {
 		ch <- true
 	}()
 	return ch
+}
+
+func TestScheduler_Jobs(t *testing.T) {
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
+	schd := New()
+	defer schd.Shutdown()
+
+	schd.PeriodFunc(2*time.Second, 2*time.Second, func() { wg.Done() }, nil)
+
+	// Cron should fire in 2 seconds. After 1 second, call Entries.
+	select {
+	case <-time.After(oneSecond):
+		schd.Jobs()
+	}
+
+	// Even though Entries was called, the cron should fire at the 2 second mark.
+	select {
+	case <-time.After(oneSecond):
+		t.Error("expected job runs at 2 second mark")
+	case <-wait(wg):
+	}
+}
+
+func TestScheduler_MultipleJobs(t *testing.T) {
+	pickTags := func(jobs []*ManagedJob) []string {
+		tags := make([]string, len(jobs))
+		for i, job := range jobs {
+			tags[i] = job.Tag().(string)
+		}
+		sort.Strings(tags)
+		return tags
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+
+	schd := New()
+
+	var counter int32
+
+	schd.CronFunc("0 0 0 1 1 ?", func() {}, "job1")
+	schd.CronFunc("* * * * * ?", func() { wg.Done(); atomic.AddInt32(&counter, 1) }, "job2")
+	mjob1, _ := schd.CronFunc("* * * * * ?", func() { t.Fatal() }, "job3")
+	mjob2, _ := schd.CronFunc("* * * * * ?", func() { t.Fatal() }, "job4")
+	schd.CronFunc("0 0 0 31 12 ?", func() {}, "job5")
+	schd.CronFunc("* * * * * ?", func() { wg.Done(); atomic.AddInt32(&counter, 1) }, "job6")
+
+	tags := pickTags(schd.Jobs())
+	assert.Equal(t, []string{"job1", "job2", "job3", "job4", "job5", "job6"}, tags)
+
+	mjob1.Cancel()
+	tags = pickTags(schd.Jobs())
+	assert.Equal(t, []string{"job1", "job2", "job4", "job5", "job6"}, tags)
+
+	mjob2.Cancel()
+	tags = pickTags(schd.Jobs())
+	assert.Equal(t, []string{"job1", "job2", "job5", "job6"}, tags)
+
+	select {
+	case <-time.After(oneSecond):
+		t.Error("expected job run in proper order")
+	case <-wait(wg):
+	}
+
+	schd.ShutdownAndWait()
+	atomic.StoreInt32(&counter, 0)
+	jobs := schd.Jobs()
+	assert.Equal(t, 0, len(jobs))
+	<-time.After(oneSecond * 2)
+	assert.Equal(t, int32(0), atomic.LoadInt32(&counter))
 }
