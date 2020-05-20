@@ -89,3 +89,53 @@ func TestCompsite(t *testing.T) {
 		}
 	}
 }
+
+type whSchedule struct {
+	times []time.Time
+}
+
+func (wht whSchedule) Next(t time.Time) time.Time {
+	for _, lt := range wht.times {
+		if lt.After(t) {
+			return lt
+		}
+	}
+	return time.Time{}
+}
+
+// ExampleUnion
+func ExampleUnion() {
+	t := time.Date(2020, 4, 25, 8, 30, 0, 0, time.Local)
+	mon2fri := cron.MustParse("30 8 ? * 1-5")
+	// The holiday (Saturday, Sunday) was transferred to a working day
+	workday := whSchedule{[]time.Time{
+		t.AddDate(0, 0, 1),  // 2020-04-26 08:30
+		t.AddDate(0, 0, 14), // 2020-05-09 08:30
+	}}
+
+	// The working day (Monday - Friday) is changed into a holiday
+	holiday := whSchedule{[]time.Time{
+		t.AddDate(0, 0, 6),  // 2020-05-01 08:30
+		t.AddDate(0, 0, 9),  // 2020-05-04 08:30
+		t.AddDate(0, 0, 10), // 2020-05-05 08:30
+	}}
+	workingSchedule := Union(Minus(mon2fri, holiday), workday)
+
+	for i := 0; i < 12; i++ {
+		t = workingSchedule.Next(t)
+		fmt.Println(t.Format("2006-01-02 15:04:05"))
+	}
+	// Output:
+	// 2020-04-26 08:30:00
+	// 2020-04-27 08:30:00
+	// 2020-04-28 08:30:00
+	// 2020-04-29 08:30:00
+	// 2020-04-30 08:30:00
+	// 2020-05-06 08:30:00
+	// 2020-05-07 08:30:00
+	// 2020-05-08 08:30:00
+	// 2020-05-09 08:30:00
+	// 2020-05-11 08:30:00
+	// 2020-05-12 08:30:00
+	// 2020-05-13 08:30:00
+}

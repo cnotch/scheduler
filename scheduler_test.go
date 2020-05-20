@@ -29,7 +29,7 @@ func TestScheduler_ScheduleAfterShutdown(t *testing.T) {
 		s := New()
 		var counter int32
 
-		s.PeriodFunc(0, time.Second, func() {
+		mj, _ := s.PeriodFunc(0, time.Second, func() {
 			atomic.AddInt32(&counter, 1)
 		}, nil)
 		<-time.After(2 * oneSecond)
@@ -37,6 +37,8 @@ func TestScheduler_ScheduleAfterShutdown(t *testing.T) {
 		want := int32(3)
 		got := atomic.LoadInt32(&counter)
 		assert.EqualValues(t, want, got)
+
+		mj.Cancel() // after shudown
 
 		_, err := s.PeriodFunc(0, time.Second, func() {
 			atomic.AddInt32(&counter, 1)
@@ -124,6 +126,34 @@ func TestScheduler_PeriodAndPanic(t *testing.T) {
 			<-time.After(100 * time.Millisecond)
 			got := atomic.LoadInt32(&counter)
 			assert.EqualValues(t, want, got)
+		})
+	})
+}
+
+func TestScheduler_PeriodAndPanicCancel(t *testing.T) {
+	t.Run("Scheduler.PeriodAndPanic", func(t *testing.T) {
+		var panicRecv interface{}
+		s := New(WithPanicHandler(func(job *ManagedJob, r interface{}) {
+			panicRecv = r
+			job.Cancel()
+		}))
+
+		defer s.Shutdown()
+		assert.NotPanics(t, func() {
+			var counter int32
+
+			mj, _ := s.PeriodFunc(0, time.Millisecond*10, func() {
+				atomic.AddInt32(&counter, 1)
+				panic("test")
+			}, nil)
+			<-time.After(100 * time.Millisecond)
+			got := atomic.LoadInt32(&counter)
+			assert.EqualValues(t, 1, got)
+			assert.Equal(t, "test", panicRecv)
+			assert.Equal(t, 0, s.Count())
+			assert.Equal(t, -1, mj.index)
+
+			mj.Cancel() // multiple calls
 		})
 	})
 }

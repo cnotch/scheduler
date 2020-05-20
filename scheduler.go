@@ -1,6 +1,28 @@
 // Copyright (c) 2019,CAO HONGJU. All rights reserved.
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
+//
+// Copyright (C) 2012 Rob Figueiredo (github.com/robfig/cron)
+// All Rights Reserved.
+//
+// MIT LICENSE
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software is furnished to do so,
+// subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+// FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+// COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+// IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+// CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 package scheduler
 
@@ -68,30 +90,32 @@ func New(options ...Option) *Scheduler {
 	return s
 }
 
-// AfterFunc posts the function f which will execute after specified delay.
-// The function f executes only once, and then remove from the Scheduler.
+// AfterFunc posts the function f to the Scheduler.
+// The function f will execute after specified delay only once,
+// and then remove from the Scheduler.
 func (s *Scheduler) AfterFunc(delay time.Duration, f func(), tag interface{}) (*ManagedJob, error) {
 	return s.After(delay, JobFunc(f), tag)
 }
 
-// After posts the job which will execute after specified delay.
-// The job executes only once, and then remove from the Scheduler.
+// After posts the job to the Scheduler.
+// The job will execute after specified delay only once,
+// and then remove from the Scheduler.
 func (s *Scheduler) After(delay time.Duration, job Job, tag interface{}) (*ManagedJob, error) {
 	return s.Schedule(&afterSchedule{delay: delay}, job, tag)
 }
 
-// PeriodFunc posts the function f which will execute the first time
-// at the specified delay, followed by a fixed period.
-// If the execution time of f exceeds the period, there will
-// be multiple instances of f running at the same time.
+// PeriodFunc posts the function f to the Scheduler.
+// The function f will execute the first time at the specified delay,
+// followed by a fixed period. If the execution time of f exceeds
+// the period, there will be multiple instances of f running at the same time.
 func (s *Scheduler) PeriodFunc(initialDelay, period time.Duration, f func(), tag interface{}) (*ManagedJob, error) {
 	return s.Period(initialDelay, period, JobFunc(f), tag)
 }
 
-// Period posts the job which will execute the first time
-// at the specified delay, followed by a fixed period.
-// If the execution time of job exceeds the period, there will
-// be multiple instances of job running at the same time.
+// Period posts the job to the Scheduler.
+// The job will execute the first time at the specified delay,
+// followed by a fixed period. If the execution time of job exceeds
+// the period, there will be multiple instances of job running at the same time.
 func (s *Scheduler) Period(initialDelay, period time.Duration, job Job, tag interface{}) (*ManagedJob, error) {
 	if period < time.Millisecond {
 		return nil, errors.New("preiod must not be less than 1ms")
@@ -99,12 +123,12 @@ func (s *Scheduler) Period(initialDelay, period time.Duration, job Job, tag inte
 	return s.Schedule(&periodSchedule{initialDelay: initialDelay, period: period}, job, tag)
 }
 
-// CronFunc posts the function f which will execute according to a cron expression.
+// CronFunc posts the function f to the Scheduler, and associate the given cron expression with it.
 func (s *Scheduler) CronFunc(cronExpr string, f func(), tag interface{}) (*ManagedJob, error) {
 	return s.Cron(cronExpr, JobFunc(f), tag)
 }
 
-// Cron posts the job which will execute according to a cron expression.
+// Cron posts the job to the Scheduler, and associate the given cron expression with it.
 func (s *Scheduler) Cron(cronExpr string, job Job, tag interface{}) (*ManagedJob, error) {
 	cexp, err := cron.Parse(cronExpr)
 	if err != nil {
@@ -113,12 +137,12 @@ func (s *Scheduler) Cron(cronExpr string, job Job, tag interface{}) (*ManagedJob
 	return s.Schedule(cexp, job, tag)
 }
 
-// ScheduleFunc posts the function f which will execute according to the specified schedule
+// ScheduleFunc posts the function f to the Scheduler, and associate the given schedule with it.
 func (s *Scheduler) ScheduleFunc(schedule Schedule, f func(), tag interface{}) (*ManagedJob, error) {
 	return s.Schedule(schedule, JobFunc(f), tag)
 }
 
-// Schedule posts the job which will execute according to the specified schedule.
+// Schedule posts the job to the Scheduler, and associate the given schedule with it.
 func (s *Scheduler) Schedule(schedule Schedule, job Job, tag interface{}) (mjob *ManagedJob, err error) {
 	defer func() { // after terminated, add throw panic
 		if r := recover(); r != nil {
@@ -147,7 +171,7 @@ func (s *Scheduler) Shutdown() {
 	s.cancel()
 }
 
-// ShutdownAndWait  shutdowns scheduler and wait for all jobs to complete.
+// ShutdownAndWait shutdowns scheduler and wait for all jobs to complete.
 func (s *Scheduler) ShutdownAndWait() {
 	s.cancel()
 	s.wg.Wait()

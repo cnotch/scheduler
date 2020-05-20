@@ -37,7 +37,13 @@ type union struct {
 func (us *union) Next(t time.Time) time.Time {
 	t1 := us.l.Next(t)
 	t2 := us.r.Next(t)
-	if t1.Before(t2) && !t1.IsZero() {
+	if t1.IsZero() {
+		return t2
+	}
+	if t2.IsZero() {
+		return t1
+	}
+	if t1.Before(t2) {
 		return t1
 	}
 	return t2
@@ -78,7 +84,7 @@ func (ms *minus) Next(t time.Time) time.Time {
 			continue
 		}
 
-		for t1.After(t2) { // t1 > t2
+		for t1.After(t2) && !t2.IsZero() { // t1 > t2
 			t2 = ms.r.Next(t2)
 		}
 	}

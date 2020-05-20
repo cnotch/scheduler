@@ -40,8 +40,24 @@ type ManagedJob struct {
 func (mjob *ManagedJob) Cancel() {
 	defer func() {
 		if r := recover(); r != nil {
+			// when mjob.remove closed
 		}
 	}()
 
 	mjob.remove <- mjob
+}
+
+// Tag returns the tag of the job.
+func (mjob *ManagedJob) Tag() interface{} {
+	return mjob.tag
+}
+
+// Schelule returns the schedule of the job.
+func (mjob *ManagedJob) Schelule() Schedule {
+	return mjob.schelule
+}
+
+// Job return the executive job  of the job.
+func (mjob *ManagedJob) Job() Job {
+	return mjob.job
 }
