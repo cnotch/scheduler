@@ -37,11 +37,12 @@ func (jobs *jobQueue) Pop() interface{} {
 	job := old[n-1]
 	old[n-1] = nil // avoid memory leak
 	job.index = -1 // for safety
+	job.setNext(time.Time{})
 	*jobs = old[0 : n-1]
 	return job
 }
 
 func (jobs *jobQueue) updateNext(job *ManagedJob, next time.Time) {
-	job.next = next
+	job.setNext(next)
 	heap.Fix(jobs, job.index)
 }

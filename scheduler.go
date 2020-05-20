@@ -152,16 +152,19 @@ func (s *Scheduler) Schedule(schedule Schedule, job Job, tag interface{}) (mjob 
 		}
 	}()
 
+	next := schedule.Next(s.now())
+	if next.IsZero() {
+		return nil, errors.New("schedule is empty, never a scheduled time to arrive")
+	}
+
 	j := &ManagedJob{
 		tag:      tag,
 		schelule: schedule,
 		job:      job,
 		remove:   s.remove,
-	}
-
-	j.next = j.schelule.Next(s.now())
-	if j.next.IsZero() {
-		return nil, errors.New("schedule is empty, never a scheduled time to arrive")
+		next:     next,
+		loc:      s.loc,
+		nextNano: next.UnixNano(),
 	}
 
 	s.add <- j

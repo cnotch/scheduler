@@ -5,6 +5,7 @@
 package scheduler
 
 import (
+	"sync/atomic"
 	"time"
 )
 
@@ -24,15 +25,17 @@ func (jf JobFunc) Run() {
 
 // ManagedJob represent the job managed by the scheduler.
 type ManagedJob struct {
-	tag interface{} // job tag
 	// immutable fields of the job
+	tag      interface{} // job tag, application provide
 	schelule Schedule
 	job      Job
 	remove   chan *ManagedJob
+	loc      *time.Location
 	// heap fields
 	index int // index of the job in the heap
 	// runtime fields
-	next time.Time // next trigger time
+	next     time.Time // next trigger time
+	nextNano int64
 	// TODO: more...
 }
 
@@ -60,4 +63,14 @@ func (mjob *ManagedJob) Schelule() Schedule {
 // Job return the executive job  of the job.
 func (mjob *ManagedJob) Job() Job {
 	return mjob.job
+}
+
+// Next returns the next execution time of the job.
+func (mjob *ManagedJob) Next() time.Time {
+	return time.Unix(0, atomic.LoadInt64(&mjob.nextNano)).In(mjob.loc)
+}
+
+func (mjob *ManagedJob) setNext(next time.Time) {
+	mjob.next = next.In(mjob.loc)
+	atomic.StoreInt64(&mjob.nextNano, next.UnixNano())
 }
