@@ -7,6 +7,7 @@ The ideas and design are based on the following projects:
 
 ## Features
 
+- Use cron expressions directly: [cron/readme](./cron/README.md)
 - Best Performance: [Benchmarks speak for themselves](#benchmarks)
 - Less memory allocation: [Benchmarks speak for themselves](#benchmarks)
 - Support schedule union,minus and intersect operations.
@@ -34,41 +35,41 @@ The ideas and design are based on the following projects:
 The following example is executed once per second(using Ind... function):
 
 ``` go
-	var calls = 0
-    cancel, _ := IndCron("* * * * * *", func() { calls++ }, nil)
-    defer cancel()
-    // other coder
+var calls = 0
+cancel, _ := IndCron("* * * * * *", func() { calls++ }, nil)
+defer cancel()
+// other coder
 ```
 
 The following example is executed for the first time at delay 1s, and then every minute(using Scheduler):
 
 ``` go
-    var counter int32
-	mj, _ := schd.PeriodFunc(time.Second, time.Minute, func() {
-		atomic.AddInt32(&counter, 1)
-    }, nil)
-    // other code
-    mj.Cancel()
+var counter int32
+mj, _ := schd.PeriodFunc(time.Second, time.Minute, func() {
+	atomic.AddInt32(&counter, 1)
+}, nil)
+// other code
+mj.Cancel()
 ```
 
 ### Handle panic example
 
 The following example cancels the job when a panic occurs
 ``` go
-    schd := scheduler.New(scheduler.WithPanicHandler(func(job *scheduler.ManagedJob, r interface{}) {
-        // other handle code
-		// If panic occurs, cancel the job;
-		// Can also not cancel, continue to execute next time
-		job.Cancel()
-    }))
+schd := scheduler.New(scheduler.WithPanicHandler(func(job *scheduler.ManagedJob, r interface{}) {
+    // other handle code
+	// If panic occurs, cancel the job;
+	// Can also not cancel, continue to execute next time
+	job.Cancel()
+}))
 
-    //...
-    var counter int32
+//...
+var counter int32
 
-	mj, _ := s.PeriodFunc(0, time.Millisecond*10, func() {
-		atomic.AddInt32(&counter, 1)
-		panic("test")
-	}, nil)
+mj, _ := s.PeriodFunc(0, time.Millisecond*10, func() {
+	atomic.AddInt32(&counter, 1)
+	panic("test")
+}, nil)
 ```
 
 ### Compsite Schedule example
