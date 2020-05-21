@@ -192,7 +192,7 @@ func (s *Scheduler) Terminated() bool {
 func (s *Scheduler) Jobs() (jobs []*ManagedJob) {
 	defer func() {
 		if r := recover(); r != nil {
-			jobs = nil
+			jobs = nil // when s.snapshot closed
 		}
 	}()
 	replyChan := make(chan []*ManagedJob, 1)

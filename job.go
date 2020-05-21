@@ -42,7 +42,7 @@ type ManagedJob struct {
 	// TODO: more...
 }
 
-// Cancel 从计划任务中取消
+// Cancel cancel the scheduled job.
 func (mjob *ManagedJob) Cancel() {
 	defer func() {
 		if r := recover(); r != nil {
