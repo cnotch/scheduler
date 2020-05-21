@@ -260,6 +260,7 @@ var benchmarkExpressions = []string{
 var benchmarkExpressionsLen = len(benchmarkExpressions)
 
 func BenchmarkParse(b *testing.B) {
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = MustParse(benchmarkExpressions[i%benchmarkExpressionsLen])
 	}

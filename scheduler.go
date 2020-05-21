@@ -152,7 +152,8 @@ func (s *Scheduler) Schedule(schedule Schedule, job Job, tag interface{}) (mjob 
 		}
 	}()
 
-	next := schedule.Next(s.now())
+	postTime := s.now()
+	next := schedule.Next(postTime)
 	if next.IsZero() {
 		return nil, errors.New("schedule is empty, never a scheduled time to arrive")
 	}
@@ -162,10 +163,10 @@ func (s *Scheduler) Schedule(schedule Schedule, job Job, tag interface{}) (mjob 
 		schelule: schedule,
 		job:      job,
 		remove:   s.remove,
+		postTime: postTime,
 		next:     next,
-		loc:      s.loc,
-		nextNano: next.UnixNano(),
 	}
+	j.nextTime.set(j.next)
 
 	s.add <- j
 	return j, nil

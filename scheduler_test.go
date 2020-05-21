@@ -239,3 +239,21 @@ func TestScheduler_MultipleJobs(t *testing.T) {
 	<-time.After(oneSecond * 2)
 	assert.Equal(t, int32(0), atomic.LoadInt32(&counter))
 }
+
+func TestManagedJob(t *testing.T) {
+	schd := New()
+	defer schd.Shutdown()
+	mjob, _ := schd.CronFunc("* * * * * ?", func() {}, "tag")
+	prev := time.Time{}.In(time.Local)
+	next := time.Now()
+	next = time.Date(next.Year(), next.Month(), next.Day(), next.Hour(), next.Minute(), next.Second(), 0, next.Location())
+	for i := 0; i < 5; i++ {
+		next = next.Add(time.Second)
+		p := mjob.PrevTime()
+		n := mjob.NextTime()
+		assert.Equal(t, prev, p)
+		assert.Equal(t, next, n)
+		<-time.After(oneSecond)
+		prev = next
+	}
+}

@@ -7,6 +7,7 @@ package scheduler
 import (
 	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
 // Job represent a 'job' to be performed.
@@ -25,17 +26,19 @@ func (jf JobFunc) Run() {
 
 // ManagedJob represent the job managed by the scheduler.
 type ManagedJob struct {
+	// heap fields
+	index int // index of the job in the heap
 	// immutable fields of the job
 	tag      interface{} // job tag, application provide
 	schelule Schedule
 	job      Job
 	remove   chan *ManagedJob
-	loc      *time.Location
-	// heap fields
-	index int // index of the job in the heap
+	postTime time.Time
+
 	// runtime fields
 	next     time.Time // next trigger time
-	nextNano int64
+	prevTime lockedTime
+	nextTime lockedTime
 	// TODO: more...
 }
 
@@ -65,12 +68,40 @@ func (mjob *ManagedJob) Job() Job {
 	return mjob.job
 }
 
-// Next returns the next execution time of the job.
-func (mjob *ManagedJob) Next() time.Time {
-	return time.Unix(0, atomic.LoadInt64(&mjob.nextNano)).In(mjob.loc)
+// PostTime returns the time the job was posted to the scheduler
+func (mjob *ManagedJob) PostTime() time.Time {
+	return mjob.postTime
+}
+
+// PrevTime returns the prev execution time of the job.
+func (mjob *ManagedJob) PrevTime() time.Time {
+	return mjob.prevTime.get().In(mjob.postTime.Location())
+}
+
+// NextTime returns the next execution time of the job.
+func (mjob *ManagedJob) NextTime() time.Time {
+	return mjob.nextTime.get().In(mjob.postTime.Location())
 }
 
 func (mjob *ManagedJob) setNext(next time.Time) {
-	mjob.next = next.In(mjob.loc)
-	atomic.StoreInt64(&mjob.nextNano, next.UnixNano())
+	mjob.prevTime.set(mjob.next)
+	mjob.next = next
+	mjob.nextTime.set(next)
+}
+
+type lockedTime struct {
+	wall uint64
+	ext  int64
+}
+
+func (lt *lockedTime) set(t time.Time) {
+	temp := (*lockedTime)(unsafe.Pointer(&t))
+	atomic.StoreUint64(&lt.wall, temp.wall)
+	atomic.StoreInt64(&lt.ext, temp.ext)
+}
+func (lt *lockedTime) get() (t time.Time) {
+	temp := (*lockedTime)(unsafe.Pointer(&t))
+	temp.wall = atomic.LoadUint64(&lt.wall)
+	temp.ext = atomic.LoadInt64(&lt.ext)
+	return
 }
