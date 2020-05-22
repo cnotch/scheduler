@@ -29,8 +29,9 @@ func handleSignal(c <-chan os.Signal) {
 		case syscall.SIGTERM:
 			fallthrough
 		case syscall.SIGINT:
-			fmt.Fprintf(os.Stderr, "global scheduler received signal `%s`, exiting...", sig.String())
+			fmt.Fprintf(os.Stderr, "default scheduler received signal `%s`, exiting...\n", sig.String())
 			defaultSchd.ShutdownAndWait()
+			os.Exit(0)
 		}
 	}
 }
