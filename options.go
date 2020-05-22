@@ -38,6 +38,9 @@ func WithLocation(location *time.Location) Option {
 // WithPanicHandler configures the panic exception handler.
 func WithPanicHandler(panicHandler PanicHandler) Option {
 	return optionFunc(func(s *Scheduler) {
-		s.panicHandler = panicHandler
+		if panicHandler == nil {
+			return
+		}
+		s.panicHandler.Store(panicHandler)
 	})
 }

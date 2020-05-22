@@ -54,7 +54,7 @@ type Scheduler struct {
 	add          chan *ManagedJob
 	remove       chan *ManagedJob
 	snapshot     chan chan []*ManagedJob
-	panicHandler PanicHandler
+	panicHandler atomic.Value
 	loc          *time.Location
 	ctx          context.Context
 	cancel       context.CancelFunc
@@ -80,10 +80,8 @@ func New(options ...Option) *Scheduler {
 		s.ctx, s.cancel = context.WithCancel(context.Background())
 	}
 
-	if s.panicHandler == nil {
-		s.panicHandler = func(job *ManagedJob, r interface{}) {
-			fmt.Fprintf(os.Stderr, "[Tag]: %+v [Error]: %+v\n", job.tag, r)
-		}
+	if s.panicHandler.Load() == nil {
+		s.panicHandler.Store(PanicHandler(defaultPanicHandle))
 	}
 
 	// start
@@ -103,7 +101,7 @@ func (s *Scheduler) AfterFunc(delay time.Duration, f func(), tag interface{}) (*
 // The job will execute after specified delay only once,
 // and then remove from the Scheduler.
 func (s *Scheduler) After(delay time.Duration, job Job, tag interface{}) (*ManagedJob, error) {
-	return s.Schedule(&afterSchedule{delay: delay}, job, tag)
+	return s.Post(&afterSchedule{delay: delay}, job, tag)
 }
 
 // PeriodFunc posts the function f to the Scheduler.
@@ -122,7 +120,7 @@ func (s *Scheduler) Period(initialDelay, period time.Duration, job Job, tag inte
 	if period < time.Millisecond {
 		return nil, errors.New("preiod must not be less than 1ms")
 	}
-	return s.Schedule(&periodSchedule{initialDelay: initialDelay, period: period}, job, tag)
+	return s.Post(&periodSchedule{initialDelay: initialDelay, period: period}, job, tag)
 }
 
 // CronFunc posts the function f to the Scheduler, and associate the given cron expression with it.
@@ -136,16 +134,16 @@ func (s *Scheduler) Cron(cronExpr string, job Job, tag interface{}) (*ManagedJob
 	if err != nil {
 		return nil, err
 	}
-	return s.Schedule(cexp, job, tag)
+	return s.Post(cexp, job, tag)
 }
 
-// ScheduleFunc posts the function f to the Scheduler, and associate the given schedule with it.
-func (s *Scheduler) ScheduleFunc(schedule Schedule, f func(), tag interface{}) (*ManagedJob, error) {
-	return s.Schedule(schedule, JobFunc(f), tag)
+// PostFunc posts the function f to the Scheduler, and associate the given schedule with it.
+func (s *Scheduler) PostFunc(schedule Schedule, f func(), tag interface{}) (*ManagedJob, error) {
+	return s.Post(schedule, JobFunc(f), tag)
 }
 
-// Schedule posts the job to the Scheduler, and associate the given schedule with it.
-func (s *Scheduler) Schedule(schedule Schedule, job Job, tag interface{}) (mjob *ManagedJob, err error) {
+// Post posts the job to the Scheduler, and associate the given schedule with it.
+func (s *Scheduler) Post(schedule Schedule, job Job, tag interface{}) (mjob *ManagedJob, err error) {
 	defer func() { // after terminated, add throw panic
 		if r := recover(); r != nil {
 			err = errors.New("scheduler is terminated")
@@ -210,6 +208,14 @@ func (s *Scheduler) Count() int {
 // Location returns the time zone location of the scheduler.
 func (s *Scheduler) Location() *time.Location {
 	return s.loc
+}
+
+// SetPanicHandler set the panic handler of the scheduler.
+func (s *Scheduler) SetPanicHandler(panicHandler PanicHandler) {
+	if panicHandler == nil {
+		return
+	}
+	s.panicHandler.Store(panicHandler)
 }
 
 func (s *Scheduler) run() {
@@ -278,7 +284,8 @@ func (s *Scheduler) safeRun(j *ManagedJob) {
 	defer func() {
 		s.wg.Done()
 		if r := recover(); r != nil {
-			s.panicHandler(j, r)
+			panicHandler := s.panicHandler.Load().(PanicHandler)
+			panicHandler(j, r)
 		}
 	}()
 	j.job.Run()
@@ -304,6 +311,10 @@ func (s *Scheduler) internalClose() {
 
 func (s *Scheduler) now() time.Time {
 	return time.Now().In(s.loc)
+}
+
+func defaultPanicHandle(job *ManagedJob, r interface{}) {
+	fmt.Fprintf(os.Stderr, "Tag: %+v\n - %+v\n", job.tag, r)
 }
 
 type afterSchedule struct {

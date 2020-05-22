@@ -7,11 +7,11 @@ The ideas and design are based on the following projects:
 
 ## Features
 
-- Use cron expressions directly: [cron/readme](./cron/README.md)
+- Fully support cron expressions: [cron/readme](./cron/README.md)
 - Best Performance: [Benchmarks speak for themselves](#benchmarks)
 - Less memory allocation: [Benchmarks speak for themselves](#benchmarks)
-- Support schedule union,minus and intersect operations.
-- Provide an scheduled job that does not depend on Scheduler.
+- Support schedule union,minus and intersect operations
+- Provide a default Scheduler
 
 ## Installing
 
@@ -31,15 +31,6 @@ The ideas and design are based on the following projects:
 ## Usage
 
 ### Simple example
-
-The following example is executed once per second(using Ind... function):
-
-``` go
-var calls = 0
-cancel, _ := IndCron("* * * * * *", func() { calls++ }, nil)
-defer cancel()
-// other coder
-```
 
 The following example is executed for the first time at delay 1s, and then every minute(using Scheduler):
 
@@ -129,41 +120,6 @@ func ExampleCompsite() {
 
 ```
 
-### Design global Scheduler
-
-Sometimes you just need to provide a global scheduler for your application. The following example shows how you can implement this requirement.
-
-``` go
-var (
-	globalSchd = scheduler.New()
-)
-
-func init() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-	go handleSignal(c)
-}
-
-func handleSignal(c <-chan os.Signal) {
-	for sig := range c {
-		switch sig {
-		case syscall.SIGTERM:
-			fallthrough
-		case syscall.SIGINT:
-			fmt.Fprintf(os.Stderr, "global scheduler received signal `%s`, exiting...", sig.String())
-			globalSchd.ShutdownAndWait()
-		}
-	}
-}
-
-// AfterFunc posts the function f to the gloabl Scheduler.
-func AfterFunc(delay time.Duration, f func(), tag interface{}) (*ManagedJob, error) {
-	return globalSchd.AfterFunc(delay, f, tag)
-}
-
-// ... other function
-
-```
 
 ## Benchmarks
 
