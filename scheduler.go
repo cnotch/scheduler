@@ -50,6 +50,7 @@ type PanicHandler func(job *ManagedJob, r interface{})
 // Once registered, the Scheduler is responsible for executing Jobs
 // when their scheduled time arrives.
 type Scheduler struct {
+	count        int64
 	wg           *sync.WaitGroup
 	add          chan *ManagedJob
 	remove       chan *ManagedJob
@@ -59,7 +60,6 @@ type Scheduler struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	terminated   bool
-	count        int64
 }
 
 // New returns a new Scheduler instance.
